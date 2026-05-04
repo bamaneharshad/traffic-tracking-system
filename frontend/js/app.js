@@ -2,7 +2,12 @@
    app.js — Shared utilities & UI helpers
    ======================================== */
 
-const API_BASE = '/api';
+const API_BASE = (
+  window.location.hostname.includes('replit') ||
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1'
+) ? '/api'
+  : 'https://traffic-tracking-system.onrender.com/api';
 
 /* ---- Auth helpers ---- */
 const Auth = {
