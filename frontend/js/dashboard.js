@@ -1,4 +1,4 @@
-const API_BASE = 'https://traffic-tracking-system.onrender.com/api';
+const API_BASE = '/api';
 let currentToken = null;
 
 document.addEventListener('DOMContentLoaded', () => {

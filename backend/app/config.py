@@ -10,7 +10,7 @@ class Config:
     # 🗄️ Database
     SQLALCHEMY_DATABASE_URI = os.getenv(
         "DATABASE_URL",
-        "mysql+pymysql://root:@localhost/traffic_system"
+        "postgresql://localhost/traffic_system"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 

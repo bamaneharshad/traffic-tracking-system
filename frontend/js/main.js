@@ -1,4 +1,4 @@
-const BASE_URL = "https://traffic-tracking-system.onrender.com/";
+const BASE_URL = "/";
 
 document.addEventListener('DOMContentLoaded', () => {
     const token = localStorage.getItem('token');
