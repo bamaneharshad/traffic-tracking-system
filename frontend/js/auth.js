@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'https://traffic-tracking-system.onrender.com/api';
 
 document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();

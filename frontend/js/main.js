@@ -1,3 +1,5 @@
+const BASE_URL = "https://traffic-tracking-system.onrender.com/";
+
 document.addEventListener('DOMContentLoaded', () => {
     const token = localStorage.getItem('token');
     const navLinks = document.getElementById('nav-links');
