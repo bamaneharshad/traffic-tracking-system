@@ -1236,6 +1236,12 @@ tbody td {
 .mb-24 { margin-bottom: 24px; }
 
 /* ---- Responsive ---- */
+@media (max-width: 900px) {
+  #profileGrid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 @media (max-width: 768px) {
   .sidebar {
     transform: translateX(-100%);

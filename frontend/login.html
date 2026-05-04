@@ -29,7 +29,7 @@
     <form class="auth-form active" id="formLogin" onsubmit="handleLogin(event)">
       <div class="form-group">
         <label class="form-label">Email address</label>
-        <input type="email" id="loginEmail" class="form-control" placeholder="you@example.com" required>
+        <input type="email" id="loginEmail" class="form-control" placeholder="you@example.com" required autocomplete="username">
       </div>
       <div class="form-group">
         <label class="form-label">Password</label>
@@ -47,11 +47,11 @@
     <form class="auth-form" id="formRegister" onsubmit="handleRegister(event)">
       <div class="form-group">
         <label class="form-label">Full Name</label>
-        <input type="text" id="regName" class="form-control" placeholder="John Smith" required>
+        <input type="text" id="regName" class="form-control" placeholder="John Smith" required autocomplete="name">
       </div>
       <div class="form-group">
         <label class="form-label">Email address</label>
-        <input type="email" id="regEmail" class="form-control" placeholder="you@example.com" required>
+        <input type="email" id="regEmail" class="form-control" placeholder="you@example.com" required autocomplete="username">
       </div>
       <div class="form-group">
         <label class="form-label">Password</label>

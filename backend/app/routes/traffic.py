@@ -19,10 +19,10 @@ def get_violations(current_user):
             'id': v.id,
             'vehicle_number': v.vehicle_number,
             'violation_type': v.violation_type,
-            'description': v.description,
-            'fine_amount': float(v.fine_amount),
-            'status': v.status,
-            'created_at': v.created_at
+            'description': v.description or '',
+            'fine_amount': float(v.fine_amount) if v.fine_amount is not None else 0.0,
+            'status': v.status or 'pending',
+            'created_at': v.created_at.isoformat() if v.created_at else None,
         })
         
     return jsonify({'violations': output}), 200
