@@ -16,7 +16,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
 
-    # 🔥 MOVE THIS LINE HERE (BEFORE BLUEPRINTS)
+    # Import models BEFORE create_all()
     from app import models
 
     from app.routes.auth import auth_bp
@@ -24,5 +24,13 @@ def create_app(config_class=Config):
 
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(traffic_bp, url_prefix='/api/traffic')
+
+    # 🔥 CREATE TABLES
+    with app.app_context():
+        db.create_all()
+
+    @app.route('/')
+    def home():
+        return {"message": "Traffic Tracking System API is running 🚀"}
 
     return app
