@@ -10,7 +10,7 @@ class Config:
     # 🗄️ Database
     SQLALCHEMY_DATABASE_URI = os.getenv(
         "DATABASE_URL",
-        "postgresql://localhost/traffic_system"
+        "postgresql://postgres.ezlywcryjufudjjcmbyw:Harshad_702270_db@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres"
     )
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
