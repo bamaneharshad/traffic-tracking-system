@@ -57,3 +57,8 @@ externalPort = 8000
 [deployment]
 deploymentTarget = "autoscale"
 run = ["sh", "-c", "cd backend && gunicorn --bind=0.0.0.0:8000 run:app & python server.py"]
+
+[userenv]
+
+[userenv.shared]
+SECRET_KEY = "cdc972b06770fe05abe3c81c46c61b64d298cb1dc7cb3606216c9436214eb5ae"
