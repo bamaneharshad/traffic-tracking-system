@@ -12,27 +12,22 @@ const PAGE_SIZE   = 10;
 document.addEventListener('DOMContentLoaded', async () => {
   if (!Auth.require()) return;
 
-  /* Show add button for admin/officer roles */
   const user = Auth.getUser();
   if (user && (user.role === 'admin' || user.role === 'officer')) {
     const btn = document.getElementById('addViolationBtn');
     if (btn) btn.style.display = 'inline-flex';
   }
 
-  /* BUG FIX: attach modal backdrop listeners here — not at parse time —
-     so the DOM is guaranteed to be ready */
   document.querySelectorAll('.modal-overlay').forEach(m => {
     m.addEventListener('click', e => { if (e.target === m) closeModal(m.id); });
   });
 
-  /* Skeleton loading */
   const body = document.getElementById('violationsBody');
   if (body) body.innerHTML = skeletonRows(7, 6);
 
   await loadViolations();
 });
 
-/* ---- Load from API ---- */
 async function loadViolations() {
   const body = document.getElementById('violationsBody');
   const info = document.getElementById('paginationInfo');
@@ -41,7 +36,6 @@ async function loadViolations() {
 
   const { ok, status, data } = await apiFetch('/traffic/violations');
 
-  /* BUG FIX: status 0 = network / backend-offline error */
   if (status === 0) {
     showOfflineBanner();
     showViolationsError('Cannot connect to server');
@@ -73,7 +67,6 @@ function showViolationsError(msg) {
     </td></tr>`;
 }
 
-/* ---- Filter + Search ---- */
 function setFilter(el, filter) {
   currentFilter = filter;
   currentPage   = 1;
@@ -83,28 +76,27 @@ function setFilter(el, filter) {
 }
 
 function applyFilters() {
-  const query = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+  const query     = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+  const typeQuery = (document.getElementById('typeFilter')?.value  || '').toLowerCase();
 
   filteredViolations = allViolations.filter(v => {
     const matchFilter = currentFilter === 'all' || v.status === currentFilter;
-    /* BUG FIX: guard against null/undefined vehicle_number or violation_type */
     const vNum  = (v.vehicle_number  || '').toLowerCase();
     const vType = (v.violation_type  || '').toLowerCase();
     const matchSearch = !query || vNum.includes(query) || vType.includes(query);
-    return matchFilter && matchSearch;
+    const matchType   = !typeQuery || vType === typeQuery;
+    return matchFilter && matchSearch && matchType;
   });
 
   applySortToFiltered();
   renderPage();
 }
 
-/* ---- Sort ---- */
 function sortBy(key) {
   currentSort = (currentSort.key === key)
     ? { key, dir: currentSort.dir === 'asc' ? 'desc' : 'asc' }
     : { key, dir: 'asc' };
 
-  /* Update column header icons */
   document.querySelectorAll('thead th').forEach(th => {
     th.classList.remove('sort-asc', 'sort-desc');
     const icon = th.querySelector('.sort-icon');
@@ -125,26 +117,16 @@ function applySortToFiltered() {
   filteredViolations.sort((a, b) => {
     let va = a[key] ?? '';
     let vb = b[key] ?? '';
-    if (key === 'fine_amount') {
-      va = parseFloat(va) || 0;
-      vb = parseFloat(vb) || 0;
-    } else if (key === 'created_at') {
-      va = new Date(va).getTime() || 0;
-      vb = new Date(vb).getTime() || 0;
-    } else if (key === 'id') {
-      va = Number(va);
-      vb = Number(vb);
-    } else {
-      va = String(va).toLowerCase();
-      vb = String(vb).toLowerCase();
-    }
+    if (key === 'fine_amount') { va = parseFloat(va) || 0; vb = parseFloat(vb) || 0; }
+    else if (key === 'created_at') { va = new Date(va).getTime() || 0; vb = new Date(vb).getTime() || 0; }
+    else if (key === 'id') { va = Number(va); vb = Number(vb); }
+    else { va = String(va).toLowerCase(); vb = String(vb).toLowerCase(); }
     if (va < vb) return dir === 'asc' ? -1 :  1;
     if (va > vb) return dir === 'asc' ?  1 : -1;
     return 0;
   });
 }
 
-/* ---- Render table ---- */
 function renderPage() {
   const tbody = document.getElementById('violationsBody');
   if (!tbody) return;
@@ -156,13 +138,11 @@ function renderPage() {
   const start = (currentPage - 1) * PAGE_SIZE;
   const items = filteredViolations.slice(start, start + PAGE_SIZE);
 
-  /* Pagination info */
   const pInfo  = document.getElementById('paginationInfo');
   const pStart = total === 0 ? 0 : start + 1;
   const pEnd   = Math.min(start + PAGE_SIZE, total);
   if (pInfo) pInfo.textContent = total === 0 ? 'No results' : `Showing ${pStart}–${pEnd} of ${total}`;
 
-  /* Empty state */
   if (items.length === 0) {
     tbody.innerHTML = `
       <tr><td colspan="7">
@@ -178,24 +158,23 @@ function renderPage() {
 
   const user   = Auth.getUser();
   const canPay = user?.role === 'citizen' || user?.role === 'admin';
+  const canDelete = user?.role === 'admin';
 
-  /* BUG FIX: do NOT inject vehicle_number directly into onclick string —
-     it can contain quotes/special chars that break JS syntax or enable XSS.
-     Use data-* attributes and a delegated event listener instead. */
   tbody.innerHTML = items.map(v => {
     const actionCell = (() => {
+      const parts = [];
+      parts.push(`<button class="btn btn-outline btn-sm js-detail-btn" data-id="${v.id}" style="padding:4px 8px;">👁 View</button>`);
       if (v.status === 'pending' && canPay) {
-        return `<button class="btn btn-primary btn-sm js-pay-btn"
-                        data-id="${v.id}"
-                        data-vehicle="${escapeHtml(v.vehicle_number)}"
-                        data-amount="${parseFloat(v.fine_amount) || 0}">
-                  💳 Pay
-                </button>`;
+        parts.push(`<button class="btn btn-primary btn-sm js-pay-btn"
+                            data-id="${v.id}"
+                            data-vehicle="${escapeHtml(v.vehicle_number)}"
+                            data-amount="${parseFloat(v.fine_amount) || 0}"
+                            style="padding:4px 8px;">💳 Pay</button>`);
       }
-      if (v.status === 'paid') {
-        return `<span style="font-size:12px;color:var(--success);font-weight:600;">✓ Paid</span>`;
+      if (canDelete) {
+        parts.push(`<button class="btn btn-sm js-delete-btn" data-id="${v.id}" style="padding:4px 8px;border:1px solid var(--danger);color:var(--danger);background:transparent;">🗑</button>`);
       }
-      return `<span style="font-size:12px;color:var(--text-muted);">—</span>`;
+      return `<div style="display:flex;gap:4px;">${parts.join('')}</div>`;
     })();
 
     return `
@@ -203,22 +182,27 @@ function renderPage() {
         <td class="td-muted" style="font-size:12px;">#${v.id}</td>
         <td><span class="vehicle-num">${escapeHtml(v.vehicle_number || '—')}</span></td>
         <td>${escapeHtml(v.violation_type || '—')}</td>
-        <td style="font-weight:700;color:var(--text-primary);">${formatCurrency(v.fine_amount)}</td>
+        <td style="font-weight:700;">${formatCurrency(v.fine_amount)}</td>
         <td>${statusBadge(v.status)}</td>
         <td class="td-muted">${formatDate(v.created_at)}</td>
         <td>${actionCell}</td>
       </tr>`;
   }).join('');
 
-  /* Delegated pay-button listener — avoids inline onclick entirely */
   tbody.querySelectorAll('.js-pay-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      openPayModal(
-        parseInt(btn.dataset.id,  10),
-        btn.dataset.vehicle,
-        parseFloat(btn.dataset.amount),
-      );
-    });
+    btn.addEventListener('click', () => openPayModal(
+      parseInt(btn.dataset.id, 10),
+      btn.dataset.vehicle,
+      parseFloat(btn.dataset.amount),
+    ));
+  });
+
+  tbody.querySelectorAll('.js-detail-btn').forEach(btn => {
+    btn.addEventListener('click', () => openDetailModal(parseInt(btn.dataset.id, 10)));
+  });
+
+  tbody.querySelectorAll('.js-delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => deleteViolation(parseInt(btn.dataset.id, 10)));
   });
 
   renderPagination(pages, currentPage);
@@ -230,9 +214,7 @@ function renderPagination(pages, cur) {
   if (pages <= 1) { btns.innerHTML = ''; return; }
 
   const mkBtn = (label, page, disabled = false, active = false) =>
-    `<button class="page-btn${active ? ' active' : ''}"
-             data-page="${page}"
-             ${disabled ? 'disabled' : ''}>${label}</button>`;
+    `<button class="page-btn${active ? ' active' : ''}" data-page="${page}" ${disabled ? 'disabled' : ''}>${label}</button>`;
 
   let html = mkBtn('‹', cur - 1, cur === 1);
   for (let i = 1; i <= pages; i++) {
@@ -245,16 +227,59 @@ function renderPagination(pages, cur) {
   html += mkBtn('›', cur + 1, cur === pages);
   btns.innerHTML = html;
 
-  /* Delegated pagination listener */
   btns.querySelectorAll('.page-btn:not([disabled])').forEach(btn => {
-    btn.addEventListener('click', () => goPage(parseInt(btn.dataset.page, 10)));
+    btn.addEventListener('click', () => { currentPage = parseInt(btn.dataset.page, 10); renderPage(); });
   });
 }
 
-function goPage(p) {
-  currentPage = p;
-  renderPage();
-  document.querySelector('.card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+/* ---- Detail Modal ---- */
+function openDetailModal(id) {
+  const v = allViolations.find(x => x.id === id);
+  if (!v) return;
+
+  const content = document.getElementById('detailContent');
+  if (content) {
+    content.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Vehicle</div>
+          <div class="vehicle-num" style="font-size:15px;">${escapeHtml(v.vehicle_number)}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Status</div>
+          ${statusBadge(v.status)}
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Violation Type</div>
+          <div style="font-size:13px;font-weight:600;">${escapeHtml(v.violation_type)}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Fine Amount</div>
+          <div style="font-size:18px;font-weight:800;color:var(--accent);">${formatCurrency(v.fine_amount)}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Recorded On</div>
+          <div style="font-size:13px;">${formatDate(v.created_at)}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Location</div>
+          <div style="font-size:13px;">${escapeHtml(v.location || '—')}</div>
+        </div>
+      </div>
+      ${v.description ? `
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Description</div>
+          <div style="font-size:13px;color:var(--text-secondary);">${escapeHtml(v.description)}</div>
+        </div>
+      ` : ''}
+      ${v.paid_at ? `<div style="font-size:12px;color:var(--success);font-weight:600;">✓ Paid on ${formatDate(v.paid_at)}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        <button class="btn btn-outline" style="flex:1;justify-content:center;" onclick="closeModal('detailModal')">Close</button>
+        ${v.status === 'pending' ? `<button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="closeModal('detailModal');openPayModal(${v.id},'${escapeHtml(v.vehicle_number)}',${parseFloat(v.fine_amount)||0})">💳 Pay Now</button>` : ''}
+      </div>
+    `;
+  }
+  document.getElementById('detailModal')?.classList.add('open');
 }
 
 /* ---- Payment Modal ---- */
@@ -275,30 +300,29 @@ function openPayModal(id, vehicle, amount) {
   document.getElementById('payModal')?.classList.add('open');
 }
 
-async function simulatePayment() {
-  /* BUG FIX: capture button reference BEFORE the async delay;
-     also null-check in case modal was closed during processing */
-  const btn = document.querySelector('#payStep1 .btn-primary');
+async function processPayment() {
+  const btn = document.getElementById('payNowBtn');
   if (!btn) return;
 
-  const origText    = btn.textContent;
-  btn.textContent   = '⏳ Processing…';
-  btn.disabled      = true;
+  const origText  = btn.textContent;
+  btn.textContent = '⏳ Processing…';
+  btn.disabled    = true;
 
-  await new Promise(r => setTimeout(r, 1800));
+  const { ok, status, data } = await apiFetch(`/traffic/violations/${payingViolationId}/pay`, { method: 'POST' });
 
-  /* If modal was closed while processing, abort gracefully */
-  const modal = document.getElementById('payModal');
-  if (!modal?.classList.contains('open')) {
-    /* BUG FIX: still re-enable the button for next open */
+  if (status === 0 || !ok) {
+    Toast.error('Payment failed', data?.message || 'Could not process payment.');
     btn.textContent = origText;
     btn.disabled    = false;
     return;
   }
 
-  /* Optimistically update local data */
+  /* Update local data */
   const v = allViolations.find(x => x.id === payingViolationId);
-  if (v) v.status = 'paid';
+  if (v) {
+    v.status  = 'paid';
+    v.paid_at = data.violation?.paid_at;
+  }
 
   const step1 = document.getElementById('payStep1');
   const step2 = document.getElementById('payStep2');
@@ -317,6 +341,16 @@ function closeModal(id) {
 }
 
 /* ---- Add Violation Modal ---- */
+function autoFine() {
+  const sel  = document.getElementById('avType');
+  const opt  = sel?.options[sel.selectedIndex];
+  const fine = opt?.dataset?.fine;
+  if (fine) {
+    const fineInput = document.getElementById('avFine');
+    if (fineInput) fineInput.value = fine;
+  }
+}
+
 function openAddModal() {
   document.getElementById('addModal')?.classList.add('open');
 }
@@ -330,7 +364,6 @@ async function submitViolation(e) {
   btn.textContent = 'Adding…';
   btn.disabled    = true;
 
-  /* BUG FIX: validate fine_amount before sending */
   const fineVal = parseFloat(document.getElementById('avFine')?.value);
   if (isNaN(fineVal) || fineVal < 0) {
     Toast.error('Invalid amount', 'Please enter a valid fine amount.');
@@ -344,6 +377,7 @@ async function submitViolation(e) {
     violation_type: document.getElementById('avType')?.value || '',
     description   : (document.getElementById('avDesc')?.value  || '').trim(),
     fine_amount   : fineVal,
+    location      : (document.getElementById('avLocation')?.value || '').trim(),
   };
 
   if (!payload.vehicle_number || !payload.violation_type) {
@@ -371,4 +405,18 @@ async function submitViolation(e) {
 
   btn.textContent = origText;
   btn.disabled    = false;
+}
+
+/* ---- Delete Violation ---- */
+async function deleteViolation(id) {
+  if (!confirm(`Delete violation #${id}? This cannot be undone.`)) return;
+
+  const { ok, data } = await apiFetch(`/traffic/violations/${id}`, { method: 'DELETE' });
+  if (ok) {
+    Toast.success('Deleted', `Violation #${id} has been removed.`);
+    allViolations = allViolations.filter(v => v.id !== id);
+    applyFilters();
+  } else {
+    Toast.error('Delete failed', data.message || 'Could not delete violation.');
+  }
 }

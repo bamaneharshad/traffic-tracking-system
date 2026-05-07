@@ -2,13 +2,13 @@
    dashboard.js — Dashboard page logic
    ======================================== */
 
-let doughnutChart   = null;
-let themeObserver   = null; /* BUG FIX: track observer so we don't leak on reload */
+let doughnutChart = null;
+let barChart      = null;
+let themeObserver = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (!Auth.require()) return;
 
-  /* Personalised greeting */
   const user = Auth.getUser();
   if (user) {
     const hour  = new Date().getHours();
@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (el) el.textContent = `${greet}, ${user.name || 'there'}. Here's your violations summary.`;
   }
 
-  /* Show skeleton rows while loading */
   const recentTable = document.getElementById('recentTable');
   if (recentTable) recentTable.innerHTML = skeletonRows(6, 3);
 
@@ -25,44 +24,60 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loadDashboardData() {
-  const { ok, status, data } = await apiFetch('/traffic/violations');
+  const user = Auth.getUser();
+  const isStaff = user?.role === 'admin' || user?.role === 'officer';
 
-  /* BUG FIX: status 0 = network error (backend offline) */
-  if (status === 0) {
+  /* Always load violations */
+  const [violRes, statsRes] = await Promise.all([
+    apiFetch('/traffic/violations'),
+    isStaff ? apiFetch('/reports/stats') : Promise.resolve({ ok: false, data: {} }),
+  ]);
+
+  if (violRes.status === 0) {
     showOfflineBanner();
     showTableError('recentTable', 6, 'Cannot reach server', loadDashboardData);
     return;
   }
 
-  if (!ok) {
-    if (status === 401) return Auth.logout();
-    Toast.error('Load failed', data.message || 'Could not fetch violation data.');
+  if (!violRes.ok) {
+    if (violRes.status === 401) return Auth.logout();
+    Toast.error('Load failed', violRes.data.message || 'Could not fetch violation data.');
     showTableError('recentTable', 6, 'Failed to load data', loadDashboardData);
     return;
   }
 
   hideOfflineBanner();
-  const violations = Array.isArray(data.violations) ? data.violations : [];
+  const violations = Array.isArray(violRes.data.violations) ? violRes.data.violations : [];
 
   /* ---- Stats ---- */
   const total    = violations.length;
   const pending  = violations.filter(v => v.status === 'pending').length;
   const paid     = violations.filter(v => v.status === 'paid').length;
-  const fines    = violations
-    .filter(v => v.status === 'pending')
+  const revenue  = violations
+    .filter(v => v.status === 'paid')
     .reduce((s, v) => s + parseFloat(v.fine_amount || 0), 0);
 
   setTextSafe('statTotal',   total);
   setTextSafe('statPending', pending);
   setTextSafe('statPaid',    paid);
-  setTextSafe('statFines',   formatCurrency(fines));
+  setTextSafe('statRevenue', formatCurrency(revenue));
 
-  /* Pending badge in sidebar nav */
+  /* Staff-only stats from reports endpoint */
+  if (isStaff && statsRes.ok) {
+    const s = statsRes.data;
+    setTextSafe('statVehicles', s.vehicles ?? '—');
+    setTextSafe('statCameras',  `${s.cameras?.active ?? '—'}/${s.cameras?.total ?? '—'}`);
+  }
+
+  /* Pending badge */
   const badge = document.getElementById('pendingBadge');
   if (badge) {
-    badge.textContent    = pending;
-    badge.style.display  = pending > 0 ? 'inline-block' : 'none';
+    badge.textContent   = pending;
+    badge.style.display = pending > 0 ? 'inline-block' : 'none';
   }
+
+  /* Wait for Chart.js to load */
+  await waitForChartJs();
 
   /* ---- Doughnut Chart ---- */
   const canvas = document.getElementById('chartDoughnut');
@@ -70,21 +85,11 @@ async function loadDashboardData() {
     const ctx       = canvas.getContext('2d');
     const contested = violations.filter(v => v.status === 'contested').length;
 
-    /* BUG FIX: destroy previous chart instance before creating a new one */
-    if (doughnutChart) {
-      doughnutChart.destroy();
-      doughnutChart = null;
-    }
-
-    /* BUG FIX: disconnect previous observer before creating a new one */
-    if (themeObserver) {
-      themeObserver.disconnect();
-      themeObserver = null;
-    }
+    if (doughnutChart) { doughnutChart.destroy(); doughnutChart = null; }
+    if (themeObserver) { themeObserver.disconnect(); themeObserver = null; }
 
     const legendColor = () =>
-      getComputedStyle(document.documentElement)
-        .getPropertyValue('--text-secondary').trim() || '#64748b';
+      getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim() || '#64748b';
 
     doughnutChart = new Chart(ctx, {
       type: 'doughnut',
@@ -102,12 +107,7 @@ async function loadDashboardData() {
         plugins: {
           legend: {
             position: 'bottom',
-            labels  : {
-              boxWidth: 10,
-              padding : 16,
-              font    : { size: 12, family: 'Inter' },
-              color   : legendColor(),
-            },
+            labels  : { boxWidth: 10, padding: 16, font: { size: 12, family: 'Inter' }, color: legendColor() },
           },
           tooltip: {
             callbacks: {
@@ -118,17 +118,52 @@ async function loadDashboardData() {
       },
     });
 
-    /* Update legend colour when theme changes — one observer per load */
     themeObserver = new MutationObserver(() => {
       if (doughnutChart) {
         doughnutChart.options.plugins.legend.labels.color = legendColor();
         doughnutChart.update('none');
       }
     });
-    themeObserver.observe(document.documentElement, {
-      attributes     : true,
-      attributeFilter: ['data-theme'],
-    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+
+  /* ---- Monthly Bar Chart (staff only) ---- */
+  if (isStaff) {
+    const monthRes = await apiFetch('/reports/violations-by-month');
+    const barCanvas = document.getElementById('chartBar');
+    if (barCanvas && monthRes.ok) {
+      const monthData = monthRes.data.data || [];
+      const labels  = monthData.map(d => d.label);
+      const counts  = monthData.map(d => d.count);
+
+      if (barChart) { barChart.destroy(); barChart = null; }
+
+      barChart = new Chart(barCanvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label          : 'Violations',
+            data           : counts,
+            backgroundColor: 'rgba(79,110,247,0.75)',
+            borderRadius   : 6,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { stepSize: 1, color: '#64748b' },
+              grid : { color: 'rgba(100,116,139,.1)' },
+            },
+            x: { ticks: { color: '#64748b' }, grid: { display: false } },
+          },
+        },
+      });
+    }
   }
 
   /* ---- Activity Feed ---- */
@@ -139,8 +174,7 @@ async function loadDashboardData() {
       .slice(0, 5);
 
     if (recent.length === 0) {
-      activityList.innerHTML =
-        `<li style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">No recent activity.</li>`;
+      activityList.innerHTML = `<li style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">No recent activity.</li>`;
     } else {
       const dotColor = { pending: 'amber', paid: 'green', contested: 'red' };
       activityList.innerHTML = recent.map(v => `
@@ -158,7 +192,7 @@ async function loadDashboardData() {
     }
   }
 
-  /* ---- Recent Violations Table (5 most recent) ---- */
+  /* ---- Recent Violations Table ---- */
   const tbody = document.getElementById('recentTable');
   if (tbody) {
     const recent5 = [...violations]
@@ -203,4 +237,17 @@ function showTableError(tbodyId, cols, msg, retryFn) {
       ⚠️ ${escapeHtml(msg)}.
       <a href="#" onclick="event.preventDefault();${retryFn.name}();" style="color:var(--accent);margin-left:6px;">Retry</a>
     </td></tr>`;
+}
+
+function waitForChartJs(timeout = 5000) {
+  return new Promise((resolve) => {
+    if (typeof Chart !== 'undefined') { resolve(); return; }
+    const start = Date.now();
+    const check = () => {
+      if (typeof Chart !== 'undefined') { resolve(); return; }
+      if (Date.now() - start > timeout) { resolve(); return; }
+      setTimeout(check, 100);
+    };
+    check();
+  });
 }

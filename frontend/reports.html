@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard — TrafficTrack</title>
+  <title>Reports — TrafficTrack</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
 </head>
@@ -67,8 +67,8 @@
 
   <main class="main-content">
     <header class="topbar">
-      <button class="hamburger" id="hamburger" aria-label="Menu"><span></span><span></span><span></span></button>
-      <div class="topbar-title">Dashboard</div>
+      <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+      <div class="topbar-title">Reports & Analytics</div>
       <div class="topbar-actions">
         <button class="icon-btn" id="themeToggle" title="Toggle dark mode">🌙</button>
         <div class="topbar-user">
@@ -83,135 +83,68 @@
 
     <div class="page-body">
       <div class="page-header">
-        <h1>Overview</h1>
-        <p id="dashboardGreeting">Here's what's happening with your violations today.</p>
+        <h1>Reports & Analytics</h1>
+        <p>Comprehensive analytics and insights for traffic violations.</p>
       </div>
 
-      <!-- Stat Cards Row 1 -->
-      <div class="stat-grid" id="statGrid">
-        <div class="stat-card">
-          <div class="stat-icon blue">📋</div>
-          <div class="stat-info">
-            <div class="stat-label">Total Violations</div>
-            <div class="stat-value" id="statTotal">—</div>
-            <div class="stat-trend neutral">All time</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon amber">⏳</div>
-          <div class="stat-info">
-            <div class="stat-label">Pending</div>
-            <div class="stat-value" id="statPending">—</div>
-            <div class="stat-trend down">Needs action</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon green">✅</div>
-          <div class="stat-info">
-            <div class="stat-label">Paid</div>
-            <div class="stat-value" id="statPaid">—</div>
-            <div class="stat-trend up">Resolved</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon red">💰</div>
-          <div class="stat-info">
-            <div class="stat-label">Revenue Collected</div>
-            <div class="stat-value" id="statRevenue">—</div>
-            <div class="stat-trend up">Paid fines</div>
-          </div>
-        </div>
-        <div class="stat-card admin-stat" style="display:none">
-          <div class="stat-icon purple">🚗</div>
-          <div class="stat-info">
-            <div class="stat-label">Registered Vehicles</div>
-            <div class="stat-value" id="statVehicles">—</div>
-            <div class="stat-trend neutral">In database</div>
-          </div>
-        </div>
-        <div class="stat-card admin-stat" style="display:none">
-          <div class="stat-icon teal">📹</div>
-          <div class="stat-info">
-            <div class="stat-label">Active Cameras</div>
-            <div class="stat-value" id="statCameras">—</div>
-            <div class="stat-trend neutral">Monitoring</div>
-          </div>
-        </div>
+      <!-- Summary Stats -->
+      <div class="stat-grid" id="reportStats">
+        <div class="stat-card"><div class="stat-icon blue">📋</div><div class="stat-info"><div class="stat-label">Total Violations</div><div class="stat-value" id="rTotal">—</div></div></div>
+        <div class="stat-card"><div class="stat-icon green">💰</div><div class="stat-info"><div class="stat-label">Revenue Collected</div><div class="stat-value" id="rRevenue">—</div></div></div>
+        <div class="stat-card"><div class="stat-icon amber">⏳</div><div class="stat-info"><div class="stat-label">Pending Revenue</div><div class="stat-value" id="rPending">—</div></div></div>
+        <div class="stat-card"><div class="stat-icon red">📊</div><div class="stat-info"><div class="stat-label">Collection Rate</div><div class="stat-value" id="rRate">—</div></div></div>
       </div>
 
-      <!-- Charts Row -->
-      <div class="charts-row" id="chartsRow">
-        <!-- Status Doughnut -->
+      <!-- Charts -->
+      <div class="charts-row" style="grid-template-columns:1fr 1fr;">
         <div class="card">
-          <div class="card-header">
-            <div>
-              <div class="card-title">Status Breakdown</div>
-              <div class="card-sub">Violations by payment status</div>
-            </div>
-          </div>
-          <div class="card-body" style="display:flex;align-items:center;justify-content:center;padding-top:12px;">
-            <div class="chart-wrap" style="height:200px;width:200px;">
-              <canvas id="chartDoughnut"></canvas>
-            </div>
-          </div>
-        </div>
-
-        <!-- Revenue Bar Chart (admin/officer) -->
-        <div class="card admin-stat" style="display:none">
           <div class="card-header">
             <div>
               <div class="card-title">Monthly Violations</div>
-              <div class="card-sub">Last 6 months trend</div>
+              <div class="card-sub">Last 6 months</div>
             </div>
           </div>
-          <div class="card-body" style="padding-top:12px;">
-            <div class="chart-wrap" style="height:200px;">
-              <canvas id="chartBar"></canvas>
+          <div class="card-body">
+            <div class="chart-wrap" style="height:240px;">
+              <canvas id="chartMonthly"></canvas>
             </div>
           </div>
         </div>
-
-        <!-- Recent Activity -->
         <div class="card">
           <div class="card-header">
             <div>
-              <div class="card-title">Recent Activity</div>
-              <div class="card-sub">Latest violation events</div>
+              <div class="card-title">Violation Types</div>
+              <div class="card-sub">Distribution by category</div>
             </div>
-            <a href="violations.html" style="font-size:12px;color:var(--accent);font-weight:600;">View all →</a>
           </div>
-          <div class="card-body" style="padding-top:12px;">
-            <ul class="activity-list" id="activityList">
-              <li class="activity-item"><div class="activity-dot blue"></div><div><div class="skeleton" style="height:14px;width:200px;margin-bottom:6px;"></div><div class="skeleton" style="height:10px;width:80px;"></div></div></li>
-              <li class="activity-item"><div class="activity-dot blue"></div><div><div class="skeleton" style="height:14px;width:160px;margin-bottom:6px;"></div><div class="skeleton" style="height:10px;width:60px;"></div></div></li>
-              <li class="activity-item"><div class="activity-dot blue"></div><div><div class="skeleton" style="height:14px;width:180px;margin-bottom:6px;"></div><div class="skeleton" style="height:10px;width:70px;"></div></div></li>
-            </ul>
+          <div class="card-body" style="display:flex;align-items:center;justify-content:center;">
+            <div class="chart-wrap" style="height:240px;width:240px;">
+              <canvas id="chartTypes"></canvas>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Recent Violations Table -->
-      <div class="card">
+      <!-- Top Violating Vehicles -->
+      <div class="card" style="margin-top:0;">
         <div class="card-header" style="padding-bottom:16px;">
           <div>
-            <div class="card-title">Recent Violations</div>
-            <div class="card-sub">5 most recent records</div>
+            <div class="card-title">Top Violating Vehicles</div>
+            <div class="card-sub">Vehicles with the most recorded violations</div>
           </div>
-          <a href="violations.html" class="btn btn-outline btn-sm">View All</a>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Vehicle</th>
-                <th>Type</th>
-                <th>Fine</th>
-                <th>Status</th>
-                <th>Date</th>
+                <th>#</th>
+                <th>Vehicle Number</th>
+                <th>Total Violations</th>
+                <th>Total Fines</th>
+                <th>Fine Bar</th>
               </tr>
             </thead>
-            <tbody id="recentTable"></tbody>
+            <tbody id="topVehiclesTable"></tbody>
           </table>
         </div>
       </div>
@@ -220,6 +153,6 @@
 </div>
 
 <script src="js/app.js"></script>
-<script src="js/dashboard.js"></script>
+<script src="js/reports.js"></script>
 </body>
 </html>
