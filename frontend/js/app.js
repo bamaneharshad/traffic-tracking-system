@@ -2,12 +2,7 @@
    app.js — Shared utilities & UI helpers
    ======================================== */
 
-const API_BASE = (
-  window.location.hostname.includes('replit') ||
-  window.location.hostname === 'localhost' ||
-  window.location.hostname === '127.0.0.1'
-) ? '/api'
-  : 'https://traffic-tracking-system.onrender.com/api';
+const API_BASE = '/api';
 
 /* ---- Auth helpers ---- */
 const Auth = {
@@ -124,6 +119,13 @@ async function apiFetch(path, options = {}, _retries = 2) {
     if (ct.includes('application/json')) {
       try { data = await res.json(); } catch { data = {}; }
     }
+
+    /* Auto-logout on 401 (expired/invalid token) — but not on login page */
+    if (res.status === 401 && token && !window.location.pathname.endsWith('login.html')) {
+      Auth.logout();
+      return { ok: false, status: 401, data: { message: 'Session expired — please sign in again.' } };
+    }
+
     return { ok: res.ok, status: res.status, data };
   } catch (err) {
     if (_retries > 0) {
@@ -131,6 +133,7 @@ async function apiFetch(path, options = {}, _retries = 2) {
       return apiFetch(path, options, _retries - 1);
     }
     console.error('[apiFetch] Network error on', path, err);
+    showOfflineBanner();
     return {
       ok    : false,
       status: 0,
@@ -181,17 +184,17 @@ function initSidebar() {
       `;
     }
 
-    /* Show admin-only items */
+    /* Show admin-only nav items — remove the inline display:none */
     if (user.role === 'admin') {
       document.querySelectorAll('.admin-only').forEach(el => {
-        el.style.display = '';
+        el.style.removeProperty('display');
       });
     }
 
-    /* Show admin stat cards (for admin/officer on dashboard) */
+    /* Show admin/officer stat cards on dashboard */
     if (user.role === 'admin' || user.role === 'officer') {
       document.querySelectorAll('.admin-stat').forEach(el => {
-        el.style.display = '';
+        el.style.removeProperty('display');
       });
     }
 
@@ -269,13 +272,13 @@ function timeAgo(d) {
 
 function statusBadge(status) {
   const map = {
-    paid      : ['badge-success', '✓ Paid'],
-    pending   : ['badge-warning', '⏳ Pending'],
-    contested : ['badge-danger',  '⚡ Contested'],
-    active    : ['badge-success', '● Active'],
-    suspended : ['badge-danger',  '✕ Suspended'],
-    offline   : ['badge-danger',  '● Offline'],
-    maintenance:['badge-warning', '⚙ Maint.'],
+    paid       : ['badge-success', '✓ Paid'],
+    pending    : ['badge-warning', '⏳ Pending'],
+    contested  : ['badge-danger',  '⚡ Contested'],
+    active     : ['badge-success', '● Active'],
+    suspended  : ['badge-danger',  '✕ Suspended'],
+    offline    : ['badge-danger',  '● Offline'],
+    maintenance: ['badge-warning', '⚙ Maint.'],
   };
   const [cls, label] = map[status] || ['badge-neutral', escapeHtml(status || '—')];
   return `<span class="badge ${cls}">${label}</span>`;
@@ -319,6 +322,12 @@ function showOfflineBanner() {
 
 function hideOfflineBanner() {
   document.getElementById('offlineBanner')?.remove();
+}
+
+/* ---- Shared modal close ---- */
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
 }
 
 /* ---- Init on DOMContentLoaded ---- */
