@@ -2,7 +2,7 @@
    app.js — Shared utilities & UI helpers
    ======================================== */
 
-const API_BASE = '/api';
+const API_BASE = "https://traffic-tracking-system.onrender.com/api";
 
 /* ---- Auth helpers ---- */
 const Auth = {
